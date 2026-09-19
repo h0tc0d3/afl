@@ -1,0 +1,13 @@
+.vscode
+benchmarks/benchmark
+benchmarks/spinlock
+benchmarks/spinlock_owner
+benchmarks/mutex
+benchmarks/mutex_pi
+benchmarks/mutex_owner
+benchmarks/mutex_recursive
+benchmarks/mutex_recursive_simple
+benchmarks/cond
+benchmarks/once
+tests/test
+tests/test-san
