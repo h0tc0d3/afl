@@ -1,0 +1,103 @@
+name: build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: "Build (${{ matrix.distro.name }}, ${{ matrix.compiler }})"
+    runs-on: ubuntu-latest
+    container: ${{ matrix.distro.container }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        distro:
+          - name: debian
+            container: debian:latest
+            family: debian
+
+          - name: ubuntu
+            container: ubuntu:latest
+            family: debian
+
+          - name: fedora
+            container: fedora:latest
+            family: redhat
+
+          - name: opensuse
+            container: opensuse/leap:latest
+            family: suse
+
+          - name: rhel
+            container: registry.access.redhat.com/ubi9/ubi:latest
+            family: redhat
+
+    steps:
+      - name: Install dependencies (Debian/Ubuntu)
+        if: matrix.distro.family == 'debian'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git clang gcc make
+
+      - name: Install dependencies (Fedora/RHEL)
+        if: matrix.distro.family == 'redhat'
+        run: |
+          dnf install -y ca-certificates git clang gcc make
+
+      - name: Install dependencies (openSUSE)
+        if: matrix.distro.family == 'suse'
+        run: |
+          zypper --non-interactive install ca-certificates git clang gcc make
+
+      - uses: actions/checkout@v4
+
+      - name: Select available test CPUs
+        run: |
+          awk '/^Cpus_allowed_list:/ { print "AFL_TEST_CPUS=" $2 }' /proc/self/status >> "$GITHUB_ENV"
+
+      - name: Build
+        run: make -j2 COMPILER=${{ matrix.compiler }}
+
+      - name: Test
+        run: make check check-stress check-debug COMPILER=${{ matrix.compiler }}
+
+  sanitizers:
+    name: "ASan / UBSan (${{ matrix.compiler }})"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sanitizer runtimes
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang gcc make libclang-rt-dev
+
+      - name: Select available test CPUs
+        run: |
+          awk '/^Cpus_allowed_list:/ { print "AFL_TEST_CPUS=" $2 }' /proc/self/status >> "$GITHUB_ENV"
+
+      - name: Test with ASan and UBSan
+        run: make check-san COMPILER=${{ matrix.compiler }}
+
+  lint-markdown:
+    name: "Lint Markdown"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the markdown files
+        run: npx --yes markdownlint-cli@0.49.1 --dot "**/*.md"

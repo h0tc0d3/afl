@@ -1,0 +1,7 @@
+# The markdown rules of the project: the markdownlint defaults with a line
+# length of 80 characters, where the exceptions that the project grants for
+# tables and code blocks are set.
+MD013:
+  line_length: 80
+  tables: false
+  code_blocks: false
